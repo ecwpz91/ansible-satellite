@@ -1,0 +1,41 @@
+---
+- name: Satellite Registration Environment Preparation and Registration
+  hosts: all
+  become: yes  # Required to run tasks as root
+  vars:
+    satellite_katello_rpm_url: "http:/example.satellite.com/pub/katello-ca-consumer-latest.noarch.rpm" # katello-ca-consumer-latest package
+    organization_label: "organization_label"  # Change this to your organization label
+    environment_label: "Development/MyView"  # Change this to your environment label
+    activation_key: "mykey"  # Change this to your activation key
+    org_for_plain_text: "Example"  # Organization for plain text registration
+    env_for_plain_text: "Development/ExampleServerBase"  # Organization environment and content view
+
+  tasks:
+    - name: Update subscription-manager and dnf packages
+      dnf:
+        name: 
+          - subscription-manager
+          - dnf
+        state: latest
+
+    - name: Check subscription status
+      command: subscription-manager status
+      register: subscription_status
+      failed_when: subscription_status.rc not in [0, 1]
+      changed_when: false
+
+    - name: Clean subscription manager if not Unknown
+      command: subscription-manager clean
+      when: "'Unknown' not in subscription_status.stdout"
+
+    - name: Install katello-ca-consumer-latest package
+      dnf:
+        name: "{{ satellite_katello_rpm_url }}"
+        state: present
+
+    - name: Register the client to the Satellite server using activation keys
+      command: subscription-manager register --org "{{ organization_label }}" --environment "{{ environment_label }}" --activationkey "{{ activation_key }}"
+
+    # - name: Example task to include a role
+    #   ansible.builtin.include_role:
+    #     name: ../roles/my_example_role
